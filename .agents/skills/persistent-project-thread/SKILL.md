@@ -1,6 +1,6 @@
 ---
 name: persistent-project-thread
-description: Maintain one long-lived project chat by separating human-visible transcript history, compactable active model context, and durable local ROOT/Child MD state. Use when the user asks to keep one chat per project, save project state before compaction, compress/compact a long chat, continue after compaction, or design a Root Engineering persistent-thread workflow.
+description: Maintain one long-lived project chat by separating human-visible transcript history, compactable active model context, durable local ROOT/Child MD state, and reusable local capabilities. Use when the user asks to keep one chat per project, save project state before compaction, compress/compact a long chat, continue after compaction, or design a Root Engineering persistent-thread workflow.
 ---
 
 # Persistent Project Thread Skill
@@ -9,12 +9,13 @@ description: Maintain one long-lived project chat by separating human-visible tr
 
 Keep a project usable in **one long-lived conversation** without treating raw chat history or active model context as the project's durable memory.
 
-Use this three-layer separation:
+Use this separation:
 
 ```text
-Chat Transcript      = human-visible project history
-Active Model Context = compactable model working memory
-Local ROOT           = persistent canonical project state
+Chat Transcript           = human-visible project history
+Active Model Context      = compactable model working memory
+Local ROOT / Child MD     = persistent canonical project state
+Local Capability Workspace= reusable Skills / hot paths / runtime assets
 ```
 
 Compaction maintains the **active model context**. It is not a request to delete the user's visible chat transcript.
@@ -27,20 +28,122 @@ Before deliberately compacting a meaningful long-running project conversation, i
 
 Durable state includes:
 
-- confirmed decisions and rationale
-- verified success paths
-- user-approved constraints
-- canonical file/path changes
-- important failure fingerprints and do-not-repeat rules
-- current project state needed after context reduction
-
-If such state exists, patch the **smallest canonical owner** first: ROOT for routing/authority, Child MD for detailed rules, or a verified hot-path document for operational execution.
+- confirmed decisions and rationale;
+- verified success paths;
+- user-approved constraints;
+- canonical file/path changes;
+- important failure fingerprints and do-not-repeat rules;
+- current project state needed after context reduction.
 
 Do **not** dump the entire conversation into ROOT. Promote only durable state.
 
 Do **not** assume the visible transcript must be copied into ROOT merely because compaction is about to occur. Transcript history and canonical project state have different roles.
 
-## 2. Default project model
+## 2. Pre-Compaction Save Gate — automatic local routing
+
+When the user says `압축해`, `컴팩션`, `채팅 정리해`, or equivalent, do not jump directly to compaction.
+
+Run this gate first:
+
+```text
+A. resolve canonical local ROOT
+B. read ROOT routing / authority
+C. identify the smallest canonical owner of any new durable state
+D. check the filesystem containing ROOT
+E. verify storage + write capability
+F. patch only the required ROOT / Child MD / Hot Path
+G. read back / verify the saved result
+H. only then allow compaction
+```
+
+### A. Resolve canonical ROOT
+
+Priority:
+
+1. Use an explicit local ROOT path supplied by project/system/user instructions.
+2. If the current project already has a known local canonical ROOT from the active workflow, reuse it.
+3. Otherwise inspect the local project/workspace for its documented ROOT entry point or local project instruction file.
+4. Once a valid local ROOT exists, **do not search File Library, Drive, GitHub, Web, or remote copies for the same canonical state** merely to prepare compaction.
+5. If no trustworthy local ROOT can be resolved and new durable state must be saved, stop and report the blocker rather than compacting blindly.
+
+### B–C. Route through ROOT
+
+Read the ROOT only as needed to identify the authoritative Child MD / Hot Path owner.
+
+Patch the **smallest canonical owner**:
+
+```text
+ROOT       → routing, authority, top-level state
+Child MD   → subsystem-specific durable state
+Hot Path   → verified repeated execution recipe
+```
+
+Do not create duplicate canonical files when an owner already exists.
+
+### D–E. Local Storage Gate
+
+Check the filesystem that actually contains the canonical ROOT, not a hard-coded mount assumption.
+
+Verify at minimum:
+
+- filesystem is present;
+- target directory is writable;
+- free bytes are sufficient for the intended write plus a reasonable safety margin;
+- free inodes are available;
+- an atomic/temp write probe is possible when safe;
+- the final canonical write succeeds.
+
+Useful Linux probes include `df -B1 <root-path>` and `df -i <root-path>` plus a harmless write/read/delete probe in the same writable directory or filesystem.
+
+**Do not hard-code `32G` or any measured baseline as a platform guarantee.**
+
+Observed research baseline on 2026-09-04 for `/mnt/data`:
+
+```text
+capacity:  33,770,192,896 bytes
+available: 24,580,431,872 bytes
+free inodes: 2,096,861
+write probe: PASS
+```
+
+See `evidence/LOCAL_STORAGE_CAPACITY_2026-09-04.md`.
+
+### F–G. Save and verify
+
+Prefer minimal, atomic changes. After writing, read back the target and verify the expected durable state is present. If the write fails, verification fails, storage is unavailable, or the filesystem becomes read-only, **do not deliberately compact yet**.
+
+Preserving active context is safer than compacting after a false assumption that state was saved.
+
+## 3. Local Capability Workspace
+
+The same writable local space can hold reusable capability, not only ROOT Markdown.
+
+Possible layers:
+
+```text
+Local ROOT / Child MDs    project truth
+Local Skills              reusable behavior contracts
+Hot Paths                 verified low-latency execution recipes
+Runtime helpers           scripts / deterministic tooling
+Caches / manifests        disposable acceleration + provenance
+Artifacts                 WAV / JSON / reports / generated outputs
+Model/runtime assets      optional large assets when capacity permits
+Recovery state            pointers / hashes / checkpoints / restore notes
+```
+
+ROOT remains small and authoritative. Bulk assets and caches belong in dedicated directories and should be referenced by path/hash when relevant.
+
+A verified method may evolve through:
+
+```text
+problem → experiment → verified success → Skill / Hot Path → local reuse
+```
+
+Important reusable Skills and recovery packages should also be mirrored to a durable external source such as GitHub because local runtime persistence is not assumed permanent.
+
+See `docs/LOCAL_CAPABILITY_WORKSPACE.md`.
+
+## 4. Default project model
 
 For ordinary project conversation, prefer:
 
@@ -51,14 +154,15 @@ For ordinary project conversation, prefer:
 → compactable active model context
 → 1 local ROOT entry point
 → routed Child MDs by responsibility
+→ reusable local Skills / Hot Paths where useful
 → compaction as needed
 ```
 
 This rule does not prohibit separate execution threads when another system contract requires them, such as isolated Codex development stages, independent agents, security boundaries, or destructive experiments.
 
-## 3. Compaction trigger priority
+## 5. Compaction trigger priority
 
-When the user explicitly asks `압축해`, `컴팩션`, `채팅 정리해`, or equivalent:
+Only after the Pre-Compaction Save Gate passes:
 
 ### Priority A — native supported compact action
 
@@ -112,7 +216,7 @@ Example diagnostic progression:
 
 Stop immediately when compaction occurs.
 
-## 4. Transcript rule
+## 6. Transcript rule
 
 Compaction is **not transcript deletion**.
 
@@ -126,11 +230,12 @@ Operational consequence:
 Need historical text for the human? → use/scroll transcript
 Need model working memory reduced?   → compact active context
 Need durable project truth?          → read Local ROOT / Child MD
+Need reusable behavior?              → load Local Skill / Hot Path
 ```
 
 Do not claim knowledge of ChatGPT's private database or storage service from this observation.
 
-## 5. Do-not-repeat rules
+## 7. Do-not-repeat rules
 
 - Do not make 3,200-line pressure output the default.
 - Do not continue pressure after compaction success.
@@ -138,22 +243,27 @@ Do not claim knowledge of ChatGPT's private database or storage service from thi
 - Do not describe active-context compaction as deletion of the visible transcript.
 - Do not describe active-context compaction as physical deletion of provider/audit records.
 - Do not compact before persisting new durable state.
+- Do not compact when required local persistence failed or cannot be verified.
+- Do not hard-code a local-storage size from one observed environment.
+- Do not search remote copies for canonical project state when a valid local ROOT already owns it.
 - Do not create a new project chat merely because the current chat is long if compaction + ROOT continuity can preserve the workflow.
 - Do not repeatedly fire no-op boundaries when success cannot be verified.
 - Do not load the entire historical transcript back into active context merely because it remains scrollable.
 - If a host-level event is not visible locally, do not keep inventing local mechanisms after broad instrumentation has falsified the obvious local hypotheses.
 
-## 6. Success criteria
+## 8. Success criteria
 
 A compaction operation is complete only when:
 
-1. durable project state needed for continuity is canonicalized locally;
-2. active-context compaction/reset is actually observed or confirmed by a supported native action;
-3. no further pressure/tool trigger is emitted after success;
-4. the visible chat remains the same project thread unless the user chooses otherwise;
-5. the next response can continue the same project using ROOT + compacted working context.
+1. canonical local ROOT was resolved when required;
+2. new durable project state needed for continuity was saved to the smallest canonical owner;
+3. local storage/write health was sufficient and the saved result was verified;
+4. active-context compaction/reset was actually observed or confirmed by a supported native action;
+5. no further pressure/tool trigger was emitted after success;
+6. the visible chat remains the same project thread unless the user chooses otherwise;
+7. the next response can continue the same project using ROOT + compacted working context + reusable local capabilities.
 
-## 7. Research evidence boundary
+## 9. Research evidence boundary
 
 Verified on 2026-09-04 in one long-lived ChatGPT execution thread.
 
@@ -184,7 +294,7 @@ Interpretation: the thread appeared already eligible for automatic compaction, a
 
 This is **environment-specific evidence**, not a universal ChatGPT guarantee or disclosure of private backend architecture.
 
-## 8. Source-backed behavioral model
+## 10. Source-backed behavioral model
 
 OpenAI Codex source provides useful implementation evidence for Codex itself:
 
@@ -194,12 +304,12 @@ OpenAI Codex source provides useful implementation evidence for Codex itself:
 
 OpenAI's ChatGPT retention documentation states that kept chats are saved to the user's account until deleted.
 
-These facts support the three-layer architecture but do not prove that ChatGPT product harness internals are identical to open-source Codex or reveal ChatGPT's backend database structure.
+These facts support the architecture but do not prove that ChatGPT product harness internals are identical to open-source Codex or reveal ChatGPT's backend database structure.
 
-See `docs/CHAT_COMPACTION_RESEARCH.md` for exact source links and experiment notes.
+See `docs/CHAT_COMPACTION_RESEARCH.md`, `docs/LOCAL_CAPABILITY_WORKSPACE.md`, and the `evidence/` directory.
 
-## 9. Root Engineering principle
+## 11. Root Engineering principle
 
 > Model is replaceable. Root persists.
 >
-> Transcript can remain. Active context can be compacted. Root preserves project state. The project continues.
+> Transcript can remain. Active context can be compacted. Root preserves project state. Skills preserve verified behavior. The project continues.
