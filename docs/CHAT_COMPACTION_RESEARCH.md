@@ -8,7 +8,41 @@ A second research question emerged later:
 
 > After active-context compaction, does the human-visible ChatGPT transcript disappear, or can the user still inspect old messages by scrolling?
 
-## Initial hypothesis
+## Stage 0 — the compaction minefield
+
+Before trying to minimize a compaction trigger, the first question was more primitive:
+
+> **Where does compaction happen at all?**
+
+The user proposed a debugging experiment in plain language: **lay mines/traps everywhere, trigger compaction, and see which trap fires.**
+
+Parallel watchers were placed around the Chat-attached local execution environment for:
+
+- process creation / termination;
+- filesystem writes and new files;
+- TCP / Unix sockets and socket appearance;
+- cgroup CPU / memory changes;
+- file-descriptor changes;
+- environment changes;
+- `threadId` / `turnId` / `conversationId`-like strings in local state/logs;
+- Codex/socket-like local endpoints;
+- packet-level observation where the environment allowed it.
+
+Control probes deliberately triggered process, keyword/string, filesystem, and socket/network watchers, proving that the minefield was capable of detecting synthetic events.
+
+Then a real automatic-compaction event was observed. The active context reset, but there was no matching decisive compaction subprocess, file rewrite, local socket event, identifier appearance, or other obvious container-local signal. The packet-level watcher could not be used because raw-network capability was unavailable, so that branch remained explicitly unverified.
+
+The conservative result was not "we found the hidden compaction command." It was the opposite:
+
+> **The compaction observed in ChatGPT was not exposed as an obvious operation inside the attached CaaS/container environment covered by the working traps.**
+
+That result shifted the research strategy upward. Instead of continuing to invent local mechanisms, the experiment treated compaction as a **host/harness-owned state transition** and moved to behavioral triggering at tool/sampling boundaries.
+
+Full evidence:
+
+- `evidence/COMPACTION_TRAP_MINEFIELD_2026-09-04.md`
+
+## Initial trigger hypothesis
 
 A large tool output might push the conversation over the host's automatic compaction threshold.
 
