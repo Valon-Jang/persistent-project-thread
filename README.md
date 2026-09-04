@@ -1,10 +1,10 @@
 # Persistent Project Thread
 
-> **A practical ChatGPT innovation: one project, one persistent thread, durable local state, and compaction instead of conversation reset.**
+> **A practical ChatGPT innovation: one project, one persistent thread, durable local state, reusable local capabilities, and compaction instead of conversation reset.**
 
 **Persistent Project Thread (PPT)** is an independent Root Engineering experiment for turning a long-running ChatGPT project into a persistent workspace instead of a sequence of disposable conversations.
 
-The key discovery is that a long-lived project can be understood as **three different memory layers**, not one:
+The architecture separates several resources that conventional chat workflows often mix together:
 
 ```text
 ONE PROJECT
@@ -15,20 +15,29 @@ ONE PROJECT
    ├── ACTIVE MODEL CONTEXT          ← compactable working memory
    │      └── compact / replace when needed
    │
-   └── LOCAL ROOT                    ← durable canonical project state
-          ├── Child MDs
-          ├── verified methods
-          ├── decisions + rationale
-          ├── failure memory
-          └── hot paths
+   ├── LOCAL ROOT                    ← durable canonical project state
+   │      ├── Child MDs
+   │      ├── decisions + rationale
+   │      ├── failure memory
+   │      └── verified routes
+   │
+   └── LOCAL CAPABILITY WORKSPACE    ← reusable behavior + execution assets
+          ├── Skills
+          ├── Hot Paths
+          ├── runtime helpers
+          ├── caches / manifests
+          ├── generated artifacts
+          ├── optional model assets
+          └── recovery state
 ```
 
-This changes the mental model completely:
+The mental model becomes:
 
 ```text
-Transcript      = history for the human
-Active context  = working memory for the model
-Local ROOT      = durable state for the project
+Transcript          = history for the human
+Active context      = working memory for the model
+Local ROOT          = durable truth for the project
+Local Skills/assets = reusable capability for future work
 ```
 
 Compaction is therefore **not the same thing as deleting the conversation**. In the tested ChatGPT thread, repeated compaction reduced/replaced active model-visible context while earlier messages remained available to the user by scrolling the same chat.
@@ -72,6 +81,8 @@ Persistent Project Thread separates the problems:
 Human history problem       → retained Chat transcript
 Durable knowledge problem   → Local ROOT / Child MD
 Active-context problem      → Compaction
+Repeated-method problem     → Local Skills / Hot Paths
+Expensive setup problem     → Local caches / runtime state
 ```
 
 That creates a different project loop:
@@ -79,10 +90,11 @@ That creates a different project loop:
 ```text
 work
 → promote durable state into ROOT
+→ promote verified methods into Skills / Hot Paths
 → keep using the same project chat
 → compact active model context when needed
-→ user can still scroll the historical transcript
-→ continue the same chat
+→ user can still scroll historical transcript
+→ continue the same chat with stronger local capability
 ```
 
 The chat becomes a **persistent project workspace**, while neither raw transcript nor active context has to serve as the project database.
@@ -91,7 +103,17 @@ The chat becomes a **persistent project workspace**, while neither raw transcrip
 
 ## The experiment that changed the design
 
-The first compaction experiment assumed that a large tool output was needed to push a long ChatGPT conversation across an automatic-compaction threshold.
+The research did not begin with the no-op trick.
+
+First, a **compaction minefield** was built around the local Chat-attached container: process watchers, filesystem traps, TCP/Unix-socket observation, cgroup changes, file descriptors, environment changes, identifier-like strings, and Codex/socket-like endpoints. Synthetic probes verified that multiple watchers worked. During a real auto-compaction event, no decisive matching local process/file/socket/identifier event appeared.
+
+That pushed the working hypothesis upward: the observed compaction looked like a **host/harness-owned transition**, not an obvious operation exposed inside the local tool container.
+
+See:
+
+- `evidence/COMPACTION_TRAP_MINEFIELD_2026-09-04.md`
+
+The next hypothesis assumed that a large tool output was needed to push the long thread across an automatic-compaction threshold.
 
 The pressure was then reduced step by step in the same long-lived thread:
 
@@ -134,6 +156,52 @@ This does **not** mean that a no-op universally forces compaction in every ChatG
 
 ---
 
+## Local Capability Workspace
+
+The writable local filesystem changes the expansion surface dramatically. It can store not just project facts but **reusable behavior and execution state**.
+
+```text
+Local ROOT / Child MDs    project truth
+Local Skills              reusable behavior contracts
+Hot Paths                 verified low-latency execution recipes
+Runtime helpers           scripts / deterministic tooling
+Caches / manifests        disposable acceleration + provenance
+Artifacts                 WAV / JSON / reports / generated outputs
+Model/runtime assets      optional large assets when capacity permits
+Recovery state            pointers / hashes / checkpoints / restore notes
+```
+
+That enables a capability accumulation loop:
+
+```text
+problem
+→ experiment
+→ verify success
+→ Skill-ize / Hot-Path the method
+→ store locally
+→ reuse later without rediscovering it
+```
+
+A base model can therefore gain a user-controlled external capability layer **without retraining the model**.
+
+The tested `/mnt/data` filesystem on 2026-09-04 reported:
+
+```text
+capacity:  33,770,192,896 bytes (~31.5 GiB)
+available: 24,580,431,872 bytes (~22.9 GiB)
+free inodes: 2,096,861
+write probe: PASS
+```
+
+These values are evidence from one environment, **not a ChatGPT storage guarantee**. The Skill must re-measure the filesystem containing the actual ROOT instead of assuming `32G`.
+
+See:
+
+- `docs/LOCAL_CAPABILITY_WORKSPACE.md`
+- `evidence/LOCAL_STORAGE_CAPACITY_2026-09-04.md`
+
+---
+
 ## The Skill
 
 Canonical Skill path:
@@ -151,17 +219,26 @@ Use it when the user says things like:
 - `이 프로젝트는 이 채팅 하나로 계속 가자`
 - "keep this project in one long-lived chat"
 
-The Skill enforces this order:
+The Skill now enforces a **Pre-Compaction Save Gate**:
 
 ```text
-1. Persist new durable project state into ROOT / Child MD
-2. Prefer a supported native compact action when one is actually exposed
-3. Otherwise use a previously verified minimal boundary trigger
-4. Verify active-context compaction
-5. Stop immediately on success
-6. Continue the same project chat
-7. Never confuse compaction with transcript deletion
+1. Resolve the canonical local ROOT
+2. Read ROOT routing and select the smallest canonical owner
+3. Measure the filesystem containing ROOT
+4. Verify free bytes / free inodes / write capability
+5. Save only new durable state to ROOT / Child MD / Hot Path
+6. Read back and verify the save
+7. Only then attempt compaction
+8. Prefer a supported native compact action if exposed
+9. Otherwise use a previously verified minimal boundary trigger
+10. Verify active-context compaction
+11. Stop immediately on success
+12. Continue the same project chat
 ```
+
+If required durable-state persistence fails, **do not deliberately compact yet**.
+
+Once a valid local ROOT exists, the Skill also avoids rediscovering the same canonical project state through File Library, Drive, GitHub, or Web merely to prepare compaction.
 
 **3,200-line pressure is evidence, not the hot path.**
 
@@ -175,29 +252,32 @@ Root Engineering started from a simple principle:
 
 Persistent Project Thread extends it:
 
-> **Conversation context can be compacted. The transcript can remain human-visible. Root preserves project state. The project continues.**
+> **Transcript can remain. Active context can be compacted. Root preserves project state. Skills preserve verified behavior. The project continues.**
 
 That yields a layered project architecture:
 
 ```text
-MODEL               replaceable
-CHAT TRANSCRIPT      retained for human history until product/user deletion rules apply
-ACTIVE CONTEXT       compactable
-TOOL / OS SESSION    restartable
-LOCAL ROOT           persistent canonical state
-PROJECT IDENTITY     persistent
+MODEL                    replaceable
+CHAT TRANSCRIPT           retained for human history until product/user deletion rules apply
+ACTIVE CONTEXT            compactable
+TOOL / OS SESSION         restartable
+LOCAL ROOT                persistent canonical state while local storage survives
+LOCAL SKILLS / HOT PATHS  reusable capability while installed
+GITHUB / EXTERNAL BACKUP  durable distribution / recovery for reusable capability
+PROJECT IDENTITY          persistent by design
 ```
 
-The model can change. Active context can shrink. The user can still inspect earlier transcript history. A runtime can restart. The project still has continuity because its canonical state exists outside transient model context.
+The model can change. Active context can shrink. The user can still inspect earlier transcript history. A runtime can restart. Verified methods can be reloaded as Skills. The project still has continuity because its authority and capability are externalized from transient model context.
 
 ---
 
 ## Why the expansion surface is large
 
-The current repository proves only a small core pattern, but the architecture opens several directions.
-
 ### Automatic state promotion
 Detect decisions, verified methods, constraints, failures, and hot paths before compaction, then patch the smallest canonical ROOT owner automatically.
+
+### Automatic capability promotion
+Detect a repeatedly verified method, package it into a Skill or Hot Path, and make it available to later work.
 
 ### Thread health management
 Track context growth, recent compactions, retrieval quality, stale assumptions, and recommend compaction before the conversation becomes noisy.
@@ -206,22 +286,25 @@ Track context growth, recent compactions, retrieval quality, stale assumptions, 
 Move from manual `압축해` to policy-based maintenance: compact at safe boundaries, after durable-state promotion, or before expensive project phases.
 
 ### Transcript-aware retrieval
-Use the retained human-visible transcript as historical evidence without forcing the entire transcript back into every active model context.
+Use retained transcript history as human evidence or selective retrieval material without forcing the whole transcript back into every active model context.
+
+### Storage-aware capability planning
+Choose whether to install models, caches, tools, or recovery bundles based on current disk/memory capacity instead of fixed assumptions.
 
 ### Project continuity across model upgrades
-Keep the same ROOT state while switching model families or reasoning modes without reconstructing the project from raw conversation history.
+Keep the same ROOT and Skill layer while switching model families or reasoning modes without reconstructing the project from raw conversation history.
 
 ### Recovery after tool/runtime loss
-Rehydrate a project from ROOT + verified hot paths instead of replaying an entire chat transcript.
+Rehydrate a project from ROOT + verified Hot Paths + external Skill backups instead of replaying an entire chat transcript.
 
 ### Multi-agent orchestration
 Use one human-facing primary project thread while isolated agents/Codex stages run in separate execution threads and return only promoted durable results.
 
-### Portable project roots
-Move the persistent ROOT between ChatGPT, Codex, local agents, or future model runtimes while keeping the project authority structure stable.
+### Portable project roots and capability packs
+Move ROOT + Skill packages between ChatGPT, Codex, local agents, or future model runtimes while keeping project authority and verified behavior stable.
 
 ### Long-horizon AI workspaces
-Treat transcript, active context, and canonical project state as separate resources—closer to an operating system for AI work than a conventional chat log.
+Treat transcript, active context, canonical state, and installed capability as separate resources—closer to an operating system for AI work than a conventional chat log.
 
 These are **roadmap directions**, not claims of completed functionality.
 
@@ -235,27 +318,14 @@ Observed in the tested ChatGPT UI:
 
 - repeated automatic compaction occurred;
 - the same turn/project could continue afterward;
-- earlier messages remained visible when scrolling upward after compaction.
+- earlier messages remained visible when scrolling upward after compaction;
+- a writable local filesystem was available and could store project/capability artifacts.
 
-OpenAI Codex source was also inspected for implementation evidence relevant to active-context compaction behavior. In particular:
+OpenAI Codex source was also inspected for implementation evidence relevant to active-context compaction behavior. OpenAI's ChatGPT retention documentation was used separately for kept-chat retention behavior.
 
-- auto-compaction can be followed by model/tool continuation in the same turn;
-- compact paths replace the live model-visible history via `Session::replace_compacted_history(...)`;
-- Codex exposes an automatic-compaction token threshold in configuration.
+These evidence types must not be conflated, and local-storage capacity/lifetime must not be generalized from one runtime measurement.
 
-OpenAI's ChatGPT retention documentation states that kept chats remain saved to the user's account until the user deletes them.
-
-These three evidence types must not be conflated:
-
-```text
-ChatGPT UI observation     → old transcript remained scrollable
-OpenAI retention policy    → kept chats are saved until deleted
-Open-source Codex evidence → active model-visible history can be replaced/compacted
-```
-
-Together they motivate the three-layer operational model, but they do **not** prove ChatGPT's private backend storage schema or that the ChatGPT product harness is internally identical to open-source Codex.
-
-This research concerns **active model-visible context and project continuity**. It does not claim provider-side raw logs, audit data, or retention records are physically deleted by compaction.
+This research does not claim ChatGPT's private backend storage schema, universal no-op compaction behavior, or permanent `/mnt/data` persistence.
 
 ---
 
@@ -270,11 +340,14 @@ This research concerns **active model-visible context and project continuity**. 
 │           └── SKILL.md
 ├── docs/
 │   ├── PERSISTENT_PROJECT_THREAD_ARCHITECTURE.md
-│   └── CHAT_COMPACTION_RESEARCH.md
+│   ├── CHAT_COMPACTION_RESEARCH.md
+│   └── LOCAL_CAPABILITY_WORKSPACE.md
 ├── evidence/
 │   ├── FORCE_COMPACT_PROTOCOL_v2.md
 │   ├── EXPERIMENT_LOG_2026-09-04.md
-│   └── TRANSCRIPT_AFTER_COMPACTION_2026-09-04.md
+│   ├── COMPACTION_TRAP_MINEFIELD_2026-09-04.md
+│   ├── TRANSCRIPT_AFTER_COMPACTION_2026-09-04.md
+│   └── LOCAL_STORAGE_CAPACITY_2026-09-04.md
 └── tools/
     └── noop_boundary.py
 ```
@@ -283,4 +356,4 @@ This research concerns **active model-visible context and project continuity**. 
 
 **Experimental / operationally verified in one long-lived ChatGPT thread.**
 
-The next research targets are repeated-compaction quality loss, transcript/context boundary behavior, and a supported native compaction path or host-visible compaction signal.
+The next research targets are repeated-compaction quality loss, automatic ROOT/Skill promotion, storage lifecycle behavior, transcript/context boundary behavior, and a supported native compaction path or host-visible compaction signal.
