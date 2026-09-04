@@ -141,6 +141,7 @@ Do not claim knowledge of ChatGPT's private database or storage service from thi
 - Do not create a new project chat merely because the current chat is long if compaction + ROOT continuity can preserve the workflow.
 - Do not repeatedly fire no-op boundaries when success cannot be verified.
 - Do not load the entire historical transcript back into active context merely because it remains scrollable.
+- If a host-level event is not visible locally, do not keep inventing local mechanisms after broad instrumentation has falsified the obvious local hypotheses.
 
 ## 6. Success criteria
 
@@ -154,7 +155,19 @@ A compaction operation is complete only when:
 
 ## 7. Research evidence boundary
 
-Verified on 2026-09-04 in one long-lived ChatGPT execution thread:
+Verified on 2026-09-04 in one long-lived ChatGPT execution thread.
+
+### Discovery experiment — trap minefield
+
+Before the trigger-minimization experiment, the environment was instrumented with a broad "minefield" of watchers covering process activity, filesystem changes, TCP/Unix sockets, cgroup changes, file descriptors, environment changes, thread/turn/conversation-like identifiers, and Codex/socket-like local endpoints.
+
+Synthetic control probes successfully triggered multiple watchers. During a real auto-compaction event, however, no decisive matching container-local process/file/socket/identifier event appeared.
+
+Conservative interpretation: the observed compaction was not exposed as an obvious operation inside the attached local CaaS/container and was consistent with a higher host/harness-owned state transition.
+
+See `evidence/COMPACTION_TRAP_MINEFIELD_2026-09-04.md`.
+
+### Trigger reduction experiment
 
 ```text
 3200 lines → observed auto-compaction
