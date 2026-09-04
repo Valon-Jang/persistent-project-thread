@@ -4,13 +4,17 @@
 
 Can a long-lived project conversation be kept as the single primary thread while reducing active context overhead, and if automatic compaction is already eligible, what is the smallest trigger needed to let it occur?
 
+A second research question emerged later:
+
+> After active-context compaction, does the human-visible ChatGPT transcript disappear, or can the user still inspect old messages by scrolling?
+
 ## Initial hypothesis
 
 A large tool output might push the conversation over the host's automatic compaction threshold.
 
 An early fallback produced thousands of harmless lines. It appeared to correlate with context reset/compaction, but it had an obvious inefficiency: a tool command generally completes its output before the next model/tool boundary. If the threshold had already been crossed partway through the output, the remainder could still be generated unnecessarily.
 
-This raised a second question:
+This raised another question:
 
 > Does the pressure text itself matter, or is the next tool/sampling boundary sufficient once the thread is already eligible for auto-compaction?
 
@@ -55,7 +59,7 @@ Pinned source observed during research:
 
 ## What is replaced?
 
-Codex compaction implementations call `Session::replace_compacted_history(...)`, and the session implementation replaces the live history structure.
+Codex compaction implementations call `Session::replace_compacted_history(...)`, and the session implementation replaces the live model-visible history structure.
 
 Relevant source paths:
 
@@ -69,11 +73,55 @@ Codex configuration also exposes `model_auto_compact_token_limit`, described as 
 - https://github.com/openai/codex/blob/3c837e568c24e4281bba4abdf3bc3c398f3fff13/codex-rs/config/src/config_toml.rs
 - https://github.com/openai/codex/blob/3c837e568c24e4281bba4abdf3bc3c398f3fff13/codex-rs/core/config.schema.json
 
-## Important distinction
+## New observation: transcript remains human-visible
 
-The source above is **OpenAI Codex source evidence**, not proof that the ChatGPT product harness is implemented identically.
+After repeated compaction in the same ChatGPT project thread, the user scrolled upward in the ChatGPT UI and confirmed that earlier messages were still visible.
 
-The ChatGPT-side no-op result is empirical evidence from the tested environment. The Codex source is used to understand a plausible compaction/continuation model and to avoid overclaiming.
+Observed behavior:
+
+```text
+long thread
+→ active-context compaction observed
+→ same thread continues
+→ user scrolls upward
+→ pre-compaction message text remains visible
+```
+
+This is a major architectural distinction.
+
+The safest operational model is now:
+
+```text
+CHAT TRANSCRIPT      = human-visible retained history
+ACTIVE MODEL CONTEXT = compactable inference working memory
+LOCAL ROOT           = durable canonical project state
+```
+
+The observation does **not** prove how ChatGPT stores transcripts internally or which database/service holds them.
+
+## Official retention evidence
+
+OpenAI's published ChatGPT retention policy states that chats kept by the user are saved to the user's account until deleted manually.
+
+Reference:
+
+- https://help.openai.com/en/articles/8983778-how-are-files-vs-chats-retained
+
+This supports the product-level fact that a kept chat can remain available as account history independently of whether its entire raw text is present in each model inference context.
+
+It still does not expose ChatGPT's private backend storage schema.
+
+## Three evidence types
+
+The research now separates three kinds of evidence:
+
+| Evidence | Supports | Does not prove |
+|---|---|---|
+| ChatGPT UI observation | old messages remained scrollable after compaction | backend DB architecture |
+| OpenAI retention policy | kept chats are saved to the account until deleted | what exact subset is sent to the model each turn |
+| Open-source Codex source | compacted model-visible history can replace active history and continue | that ChatGPT product harness is internally identical |
+
+The three-layer Persistent Project Thread architecture is based on the intersection of these observations, not on pretending they are the same thing.
 
 ## Overshoot finding
 
@@ -97,11 +145,26 @@ When the environment has already demonstrated the same behavior:
 persist durable state
 → emit no disposable text
 → create one zero-output tool boundary
-→ observe/confirm compaction
+→ observe/confirm active-context compaction
 → stop immediately
+→ continue same project thread
 ```
 
 If no compaction occurs, do not loop blindly. Escalate through bounded small probes only for diagnosis.
+
+## Practical implication
+
+Compaction can now be treated as **model working-memory maintenance**, not conversation erasure.
+
+For the tested workflow this means:
+
+```text
+Human wants history?    → scroll transcript
+Model needs continuity? → compacted active context + selective context
+Project needs authority?→ Local ROOT / Child MD
+```
+
+This creates a path toward keeping one long-lived human-facing project conversation for much longer than a raw-context-only design would suggest.
 
 ## Open research
 
@@ -110,7 +173,11 @@ If no compaction occurs, do not loop blindly. Escalate through bounded small pro
 3. Characterize when a zero-output boundary is sufficient versus when additional context growth is required.
 4. Build a reliable host-visible compaction-success signal instead of inferring it from context reset behavior.
 5. Measure quality loss across repeated compactions for different project types.
+6. Test how many compaction cycles one long-lived project thread can survive before continuity or retrieval quality degrades.
+7. Determine what historical transcript content can be selectively reintroduced without loading the entire transcript into active context.
 
 ## Privacy / retention non-claim
 
-This research concerns **active model-visible conversation context**. It makes no claim that provider-side raw conversation, audit, safety, or legal-retention records are physically erased by compaction.
+This research concerns **active model-visible conversation context, visible transcript behavior, and project continuity**.
+
+It does not claim that compaction physically deletes provider-side raw conversation, audit, safety, or legal-retention records. It also does not claim access to ChatGPT's private backend database design.
