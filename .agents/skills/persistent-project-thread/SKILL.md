@@ -1,21 +1,23 @@
 ---
 name: persistent-project-thread
-description: Maintain one long-lived project chat by promoting durable state into a local ROOT/Child MD hierarchy and compacting active conversation when needed. Use when the user asks to keep one chat per project, save project state before compaction, compress/compact a long chat, continue after compaction, or design a Root Engineering persistent-thread workflow.
+description: Maintain one long-lived project chat by separating human-visible transcript history, compactable active model context, and durable local ROOT/Child MD state. Use when the user asks to keep one chat per project, save project state before compaction, compress/compact a long chat, continue after compaction, or design a Root Engineering persistent-thread workflow.
 ---
 
 # Persistent Project Thread Skill
 
 ## 0. Purpose
 
-Keep a project usable in **one long-lived conversation** without treating raw chat history as the project's durable memory.
+Keep a project usable in **one long-lived conversation** without treating raw chat history or active model context as the project's durable memory.
 
-Use this separation:
+Use this three-layer separation:
 
 ```text
-Conversation = working memory
-Local ROOT   = persistent project state
-Compaction   = working-memory maintenance
+Chat Transcript      = human-visible project history
+Active Model Context = compactable model working memory
+Local ROOT           = persistent canonical project state
 ```
+
+Compaction maintains the **active model context**. It is not a request to delete the user's visible chat transcript.
 
 The project continues in the same thread after compaction whenever the host supports that behavior.
 
@@ -36,6 +38,8 @@ If such state exists, patch the **smallest canonical owner** first: ROOT for rou
 
 Do **not** dump the entire conversation into ROOT. Promote only durable state.
 
+Do **not** assume the visible transcript must be copied into ROOT merely because compaction is about to occur. Transcript history and canonical project state have different roles.
+
 ## 2. Default project model
 
 For ordinary project conversation, prefer:
@@ -43,6 +47,8 @@ For ordinary project conversation, prefer:
 ```text
 1 project
 → 1 long-lived primary Chat thread
+→ retained human-visible transcript
+→ compactable active model context
 → 1 local ROOT entry point
 → routed Child MDs by responsibility
 → compaction as needed
@@ -73,9 +79,9 @@ Then:
 ```text
 persist durable state
 → execute exactly one zero-output no-op boundary
-→ verify compaction
+→ verify active-context compaction
 → STOP triggering immediately on success
-→ continue normal work
+→ continue normal work in the same thread
 ```
 
 The reference no-op is semantically just:
@@ -106,26 +112,47 @@ Example diagnostic progression:
 
 Stop immediately when compaction occurs.
 
-## 4. Do-not-repeat rules
+## 4. Transcript rule
+
+Compaction is **not transcript deletion**.
+
+In the verified 2026-09-04 ChatGPT experiment, earlier messages remained visible when the user scrolled upward after repeated compaction events.
+
+OpenAI's published ChatGPT retention documentation also states that chats kept by the user remain saved to the account until deleted.
+
+Operational consequence:
+
+```text
+Need historical text for the human? → use/scroll transcript
+Need model working memory reduced?   → compact active context
+Need durable project truth?          → read Local ROOT / Child MD
+```
+
+Do not claim knowledge of ChatGPT's private database or storage service from this observation.
+
+## 5. Do-not-repeat rules
 
 - Do not make 3,200-line pressure output the default.
 - Do not continue pressure after compaction success.
 - Do not assume a zero-output boundary universally forces compaction.
+- Do not describe active-context compaction as deletion of the visible transcript.
 - Do not describe active-context compaction as physical deletion of provider/audit records.
 - Do not compact before persisting new durable state.
 - Do not create a new project chat merely because the current chat is long if compaction + ROOT continuity can preserve the workflow.
 - Do not repeatedly fire no-op boundaries when success cannot be verified.
+- Do not load the entire historical transcript back into active context merely because it remains scrollable.
 
-## 5. Success criteria
+## 6. Success criteria
 
 A compaction operation is complete only when:
 
 1. durable project state needed for continuity is canonicalized locally;
-2. compaction/reset is actually observed or confirmed by a supported native action;
+2. active-context compaction/reset is actually observed or confirmed by a supported native action;
 3. no further pressure/tool trigger is emitted after success;
-4. the next response can continue the same project using ROOT + compacted working context.
+4. the visible chat remains the same project thread unless the user chooses otherwise;
+5. the next response can continue the same project using ROOT + compacted working context.
 
-## 6. Research evidence boundary
+## 7. Research evidence boundary
 
 Verified on 2026-09-04 in one long-lived ChatGPT execution thread:
 
@@ -138,9 +165,13 @@ Verified on 2026-09-04 in one long-lived ChatGPT execution thread:
 zero-output no-op tool boundary → observed auto-compaction
 ```
 
-Interpretation: the thread appeared already eligible for automatic compaction, and a subsequent tool/sampling boundary was sufficient to let the host perform it. This is **environment-specific evidence**, not a universal ChatGPT guarantee.
+After repeated compactions, the user also verified that earlier pre-compaction messages remained visible by scrolling upward in the same ChatGPT conversation.
 
-## 7. Source-backed behavioral model
+Interpretation: the thread appeared already eligible for automatic compaction, and a subsequent tool/sampling boundary was sufficient to let the host perform it. The visible transcript and active model context behaved as different operational layers.
+
+This is **environment-specific evidence**, not a universal ChatGPT guarantee or disclosure of private backend architecture.
+
+## 8. Source-backed behavioral model
 
 OpenAI Codex source provides useful implementation evidence for Codex itself:
 
@@ -148,12 +179,14 @@ OpenAI Codex source provides useful implementation evidence for Codex itself:
 - compaction paths call `Session::replace_compacted_history(...)` to replace the live model-visible history with compacted history.
 - Codex configuration includes an auto-compaction token threshold.
 
-These facts support the general architecture but do not prove that ChatGPT product harness internals are identical to open-source Codex.
+OpenAI's ChatGPT retention documentation states that kept chats are saved to the user's account until deleted.
+
+These facts support the three-layer architecture but do not prove that ChatGPT product harness internals are identical to open-source Codex or reveal ChatGPT's backend database structure.
 
 See `docs/CHAT_COMPACTION_RESEARCH.md` for exact source links and experiment notes.
 
-## 8. Root Engineering principle
+## 9. Root Engineering principle
 
 > Model is replaceable. Root persists.
 >
-> Conversation can be compacted. Root preserves project state. The project continues.
+> Transcript can remain. Active context can be compacted. Root preserves project state. The project continues.
