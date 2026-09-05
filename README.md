@@ -1,27 +1,27 @@
 # Persistent Project Thread
 
-> **A practical ChatGPT innovation: one project, one persistent thread, durable local state, reusable local capabilities, and compaction instead of conversation reset.**
+> **A ChatGPT persistence experiment: durable project state, compactable model context, and the discovery that the thread itself is also a replaceable resource.**
 
-**Persistent Project Thread (PPT)** is an independent Root Engineering experiment for turning a long-running ChatGPT project into a persistent workspace instead of a sequence of disposable conversations.
+**Persistent Project Thread (PPT)** is an independent Root Engineering experiment that began by asking whether one long-running ChatGPT project could become a persistent workspace instead of a sequence of disposable conversations.
 
-The architecture separates several resources that conventional chat workflows often mix together:
+The architecture separated several resources that conventional chat workflows often mix together:
 
 ```text
 ONE PROJECT
    │
-   ├── CHAT TRANSCRIPT               ← human-visible history
-   │      └── old messages can remain scrollable after compaction
+   ├── CHAT / THREAD SURFACE          ← product-level session container
    │
-   ├── ACTIVE MODEL CONTEXT          ← compactable working memory
-   │      └── compact / replace when needed
+   ├── CHAT TRANSCRIPT                ← human-visible history
    │
-   ├── LOCAL ROOT                    ← durable canonical project state
+   ├── ACTIVE MODEL CONTEXT           ← compactable working memory
+   │
+   ├── LOCAL ROOT                     ← durable canonical project state
    │      ├── Child MDs
    │      ├── decisions + rationale
    │      ├── failure memory
    │      └── verified routes
    │
-   └── LOCAL CAPABILITY WORKSPACE    ← reusable behavior + execution assets
+   └── LOCAL CAPABILITY WORKSPACE     ← reusable behavior + execution assets
           ├── Skills
           ├── Hot Paths
           ├── runtime helpers
@@ -31,7 +31,7 @@ ONE PROJECT
           └── recovery state
 ```
 
-The mental model becomes:
+The mental model originally became:
 
 ```text
 Transcript          = history for the human
@@ -54,9 +54,67 @@ This repository packages the operating pattern as both **research** and an execu
 
 ---
 
+## Important update — the permanent-thread hypothesis failed
+
+The original long-horizon hypothesis was stronger than the verified compaction findings:
+
+> **If durable project state is externalized and active model context can be repeatedly compacted, one ChatGPT thread can become a practically permanent project workspace.**
+
+That stronger hypothesis was eventually falsified.
+
+The active-context part worked for substantial periods:
+
+- automatic compaction was observed repeatedly;
+- the same conversation continued after compaction;
+- older messages remained visible to the user;
+- project truth could remain externalized in a Local ROOT.
+
+But a later long-horizon observation exposed a higher-level boundary:
+
+```text
+long-running ChatGPT thread
+→ repeated active-context compaction
+→ human-visible transcript keeps accumulating
+→ same thread eventually becomes unavailable for continued work
+```
+
+Therefore:
+
+> **Managing active model context is not sufficient to make one ChatGPT thread indefinitely persistent.**
+
+The exact internal cause is unknown. This repository does not claim a specific message-count threshold, transcript-token threshold, UI limit, backend limit, or private OpenAI policy rule. The strongest supported conclusion is that the tested ChatGPT/OpenAI-hosted environment exposed a **thread/product-level lifecycle boundary independent of successful active-context compaction**.
+
+Full evidence:
+
+- `evidence/LONG_HORIZON_THREAD_LIMIT_2026-09-05.md`
+
+This failure changed the architecture rather than ending the research.
+
+The persistence boundary moves upward:
+
+```text
+PROJECT / AGENT IDENTITY
+    ≠ THREAD
+    ≠ HUMAN-VISIBLE TRANSCRIPT
+    ≠ ACTIVE MODEL CONTEXT
+    ≠ TOOL / MODEL RUNTIME
+```
+
+The new principle is:
+
+> **The goal is not to make the thread permanent. The goal is to make the project survive the thread.**
+
+The generalized research continues under **[Root Engineering](https://github.com/Valon-Jang/Root-Engineering)**.
+
+> **Model is replaceable. Context is replaceable. Thread is replaceable. Root persists.**
+
+Persistent Project Thread remains the experiment and evidence repository that exposed this boundary.
+
+---
+
 ## Why this could matter
 
-Long AI projects usually hit one of two failure modes.
+Long AI projects usually hit more than one failure mode.
 
 ### 1. Many-chat fragmentation
 
@@ -75,7 +133,11 @@ Context stays small, but project state becomes fragmented across conversations.
 
 Keeping one conversation preserves continuity, but active context keeps growing and can become slower, noisier, or harder to manage.
 
-Persistent Project Thread separates the problems:
+### 3. Thread-level lifetime
+
+Even if active model context is successfully compacted, the hosting product may still impose an independent lifecycle boundary on the conversation itself. The tested long-horizon ChatGPT thread eventually demonstrated this failure mode.
+
+Persistent Project Thread therefore separates the problems:
 
 ```text
 Human history problem       → retained Chat transcript
@@ -83,21 +145,22 @@ Durable knowledge problem   → Local ROOT / Child MD
 Active-context problem      → Compaction
 Repeated-method problem     → Local Skills / Hot Paths
 Expensive setup problem     → Local caches / runtime state
+Thread-lifetime problem     → project identity must survive thread replacement
 ```
 
-That creates a different project loop:
+That creates a more general project loop:
 
 ```text
 work
 → promote durable state into ROOT
 → promote verified methods into Skills / Hot Paths
-→ keep using the same project chat
-→ compact active model context when needed
-→ user can still scroll historical transcript
-→ continue the same chat with stronger local capability
+→ compact active model context when useful
+→ keep using the current thread while it remains viable
+→ when the thread reaches a product boundary, preserve project identity outside it
+→ rehydrate the next execution surface from canonical state
 ```
 
-The chat becomes a **persistent project workspace**, while neither raw transcript nor active context has to serve as the project database.
+The chat can still be a useful **project workspace**, but the thread itself is no longer treated as the permanent object.
 
 ---
 
@@ -150,7 +213,14 @@ compact active context
 → old message text is still visible
 ```
 
-So active-context compaction and human-visible transcript retention must be treated as different operational concerns.
+So active-context compaction and human-visible transcript retention had to be treated as different operational concerns.
+
+The 2026-09-05 long-horizon observation added one more boundary:
+
+```text
+active context can be maintained
+≠ thread can live forever
+```
 
 This does **not** mean that a no-op universally forces compaction in every ChatGPT conversation. It is environment-specific evidence from the tested thread. See the research document for the conservative interpretation.
 
@@ -233,7 +303,7 @@ The Skill now enforces a **Pre-Compaction Save Gate**:
 9. Otherwise use a previously verified minimal boundary trigger
 10. Verify active-context compaction
 11. Stop immediately on success
-12. Continue the same project chat
+12. Continue the same project chat while that thread remains viable
 ```
 
 If required durable-state persistence fails, **do not deliberately compact yet**.
@@ -241,6 +311,8 @@ If required durable-state persistence fails, **do not deliberately compact yet**
 Once a valid local ROOT exists, the Skill also avoids rediscovering the same canonical project state through File Library, Drive, GitHub, or Web merely to prepare compaction.
 
 **3,200-line pressure is evidence, not the hot path.**
+
+The current Skill does **not** implement automatic provider-thread rollover. That is a Root Engineering research direction derived from the long-horizon failure.
 
 ---
 
@@ -250,24 +322,30 @@ Root Engineering started from a simple principle:
 
 > **Model is replaceable. Root persists.**
 
-Persistent Project Thread extends it:
+Persistent Project Thread first extended it:
 
-> **Transcript can remain. Active context can be compacted. Root preserves project state. Skills preserve verified behavior. The project continues.**
+> **Transcript can remain. Active context can be compacted. Root preserves project state. Skills preserve verified behavior.**
+
+The long-horizon thread failure extends it again:
+
+> **Model is replaceable. Context is replaceable. Thread is replaceable. Root persists.**
 
 That yields a layered project architecture:
 
 ```text
 MODEL                    replaceable
-CHAT TRANSCRIPT           retained for human history until product/user deletion rules apply
-ACTIVE CONTEXT            compactable
+ACTIVE CONTEXT            compactable / replaceable
+CHAT THREAD / SESSION     replaceable at the architecture level
+CHAT TRANSCRIPT           retained according to product/user controls, but not a persistence authority
 TOOL / OS SESSION         restartable
-LOCAL ROOT                persistent canonical state while local storage survives
+LOCAL ROOT                canonical project state while local storage survives
+CHECKPOINT                resume bridge across context/session replacement
 LOCAL SKILLS / HOT PATHS  reusable capability while installed
 GITHUB / EXTERNAL BACKUP  durable distribution / recovery for reusable capability
 PROJECT IDENTITY          persistent by design
 ```
 
-The model can change. Active context can shrink. The user can still inspect earlier transcript history. A runtime can restart. Verified methods can be reloaded as Skills. The project still has continuity because its authority and capability are externalized from transient model context.
+The model can change. Active context can shrink. A thread can eventually reach a host boundary. A runtime can restart. Verified methods can be reloaded as Skills. The project still has continuity only if its authority and capability are externalized from those transient resources.
 
 ---
 
@@ -280,7 +358,13 @@ Detect decisions, verified methods, constraints, failures, and hot paths before 
 Detect a repeatedly verified method, package it into a Skill or Hot Path, and make it available to later work.
 
 ### Thread health management
-Track context growth, recent compactions, retrieval quality, stale assumptions, and recommend compaction before the conversation becomes noisy.
+Track context growth, recent compactions, retrieval quality, stale assumptions, transcript growth, and signs that a thread may be approaching a product-level boundary.
+
+### Thread/session rollover
+Treat thread replacement as a normal lifecycle event: persist authoritative state, refresh CHECKPOINT, establish a new execution session, selectively rehydrate only what is required, and continue the same project identity. This is a research direction, not a currently verified ChatGPT-native capability.
+
+### Human-view compression
+A future user-owned platform could preserve raw event history separately while collapsing older visible conversation segments into summaries/cards that can be expanded on demand. This could remove the requirement that the entire accumulated transcript remain permanently rendered in one chat surface.
 
 ### Compaction scheduler
 Move from manual `압축해` to policy-based maintenance: compact at safe boundaries, after durable-state promotion, or before expensive project phases.
@@ -298,13 +382,13 @@ Keep the same ROOT and Skill layer while switching model families or reasoning m
 Rehydrate a project from ROOT + verified Hot Paths + external Skill backups instead of replaying an entire chat transcript.
 
 ### Multi-agent orchestration
-Use one human-facing primary project thread while isolated agents/Codex stages run in separate execution threads and return only promoted durable results.
+Use one stable project identity while primary human-facing surfaces and isolated execution agents may use different, replaceable sessions.
 
 ### Portable project roots and capability packs
 Move ROOT + Skill packages between ChatGPT, Codex, local agents, or future model runtimes while keeping project authority and verified behavior stable.
 
 ### Long-horizon AI workspaces
-Treat transcript, active context, canonical state, and installed capability as separate resources—closer to an operating system for AI work than a conventional chat log.
+Treat thread, transcript, active context, canonical state, and installed capability as separate resources—closer to an operating system for AI work than a conventional chat log.
 
 These are **roadmap directions**, not claims of completed functionality.
 
@@ -312,20 +396,20 @@ These are **roadmap directions**, not claims of completed functionality.
 
 ## Research boundary
 
-Verified empirically on **2026-09-04** in one long-lived ChatGPT execution thread with tool execution available.
-
-Observed in the tested ChatGPT UI:
+Verified empirically on **2026-09-04** in one long-lived ChatGPT execution thread with tool execution available:
 
 - repeated automatic compaction occurred;
 - the same turn/project could continue afterward;
 - earlier messages remained visible when scrolling upward after compaction;
 - a writable local filesystem was available and could store project/capability artifacts.
 
+A later observation on **2026-09-05** in the long-lived project workflow found that repeated active-context compaction did **not** make the same ChatGPT thread indefinitely usable. The thread eventually reached a product-level boundary and became unavailable for continued work. The internal cause of that boundary is unknown.
+
 OpenAI Codex source was also inspected for implementation evidence relevant to active-context compaction behavior. OpenAI's ChatGPT retention documentation was used separately for kept-chat retention behavior.
 
 These evidence types must not be conflated, and local-storage capacity/lifetime must not be generalized from one runtime measurement.
 
-This research does not claim ChatGPT's private backend storage schema, universal no-op compaction behavior, or permanent `/mnt/data` persistence.
+This research does not claim ChatGPT's private backend storage schema, universal no-op compaction behavior, permanent `/mnt/data` persistence, or a specific private rule responsible for the observed thread-level limit.
 
 ---
 
@@ -347,13 +431,22 @@ This research does not claim ChatGPT's private backend storage schema, universal
 │   ├── EXPERIMENT_LOG_2026-09-04.md
 │   ├── COMPACTION_TRAP_MINEFIELD_2026-09-04.md
 │   ├── TRANSCRIPT_AFTER_COMPACTION_2026-09-04.md
-│   └── LOCAL_STORAGE_CAPACITY_2026-09-04.md
+│   ├── LOCAL_STORAGE_CAPACITY_2026-09-04.md
+│   └── LONG_HORIZON_THREAD_LIMIT_2026-09-05.md
 └── tools/
     └── noop_boundary.py
 ```
 
 ## Status
 
-**Experimental / operationally verified in one long-lived ChatGPT thread.**
+**Experimental research. The permanent-single-thread hypothesis is falsified; the surviving persistence architecture continues under Root Engineering.**
 
-The next research targets are repeated-compaction quality loss, automatic ROOT/Skill promotion, storage lifecycle behavior, transcript/context boundary behavior, and a supported native compaction path or host-visible compaction signal.
+Persistent Project Thread remains useful as the evidence repository for:
+
+- active-context compaction behavior;
+- transcript/context separation;
+- local Root and capability preservation;
+- compaction trigger reduction;
+- and the long-horizon discovery that thread lifetime is a separate resource boundary.
+
+The next research target is no longer “make one ChatGPT thread permanent.” It is **project/agent continuity across replaceable models, contexts, runtimes, and threads**.
